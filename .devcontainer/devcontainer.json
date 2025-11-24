@@ -1,0 +1,18 @@
+{
+  "name": "Music Warehouse Dev",
+  "dockerComposeFile": [
+    "../docker-compose.yml"
+  ],
+  "service": "airflow-scheduler", 
+  "workspaceFolder": "/opt/airflow",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "innoverio.vscode-dbt-power-user",
+        "mechatroner.rainbow-csv"
+      ]
+    }
+  },
+  "remoteUser": "airflow"
+}

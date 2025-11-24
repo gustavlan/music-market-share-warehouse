@@ -1,0 +1,12 @@
+# connecting dbt transformer to the duckdb data warehouse
+
+music_warehouse:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ./opt/airflow/data/music_warehouse.duckdb # location in container where duckdb file lives
+      extensions:
+        - httpfs
+        - parquet
+      threads: 4

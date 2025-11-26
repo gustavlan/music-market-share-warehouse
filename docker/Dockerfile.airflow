@@ -18,7 +18,8 @@ RUN pip install --no-cache-dir \
     pandas \
     playwright \
     beautifulsoup4 \
-    lxml
+    lxml \
+    pyarrow
 
 # NOW switch to root to install SYSTEM dependencies for Playwright
 USER root

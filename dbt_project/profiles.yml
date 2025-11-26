@@ -5,7 +5,7 @@ music_warehouse:
   outputs:
     dev:
       type: duckdb
-      path: ./opt/airflow/data/music_warehouse.duckdb # location in container where duckdb file lives
+      path: /opt/airflow/data/music_warehouse.duckdb # location in container where duckdb file lives
       extensions:
         - httpfs
         - parquet

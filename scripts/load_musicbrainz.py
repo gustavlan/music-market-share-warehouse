@@ -14,15 +14,23 @@ def load_labels_to_duckdb():
     print("Loading Label Data (this may take a minute)...")
 
     con.execute(f"""
-        CREATE OR REPLACE TABLE raw_musicbrainz_labels AS
-        SELECT 
-            id AS mb_id,
-            name,
-            type,
-            "label-code" AS label_code,
-            relations
-        FROM read_json_auto('{JSON_FILE_PATH}', ignore_errors=true);
-    """)
+            CREATE OR REPLACE TABLE raw_musicbrainz_labels AS
+            SELECT 
+                id as mb_id, 
+                name, 
+                "label-code" as label_code,
+                relations
+            FROM read_json('{JSON_FILE_PATH}', 
+                columns={
+                    'id': 'VARCHAR', 
+                    'name': 'VARCHAR', 
+                    'label-code': 'INTEGER', 
+                    'relations': 'JSON',
+                    'type': 'VARCHAR'
+                },
+                maximum_object_size=20000000
+            );
+        """)
 
     count = con.execute("SELECT COUNT(*) FROM raw_musicbrainz_labels").fetchone()[0]
     print(f"✅ Successfully loaded {count:,} labels into 'raw_musicbrainz_labels'.")

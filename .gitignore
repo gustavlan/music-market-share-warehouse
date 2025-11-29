@@ -146,6 +146,7 @@ venv.bak/
 
 # Project data (large MusicBrainz dumps)
 data/raw/musicbrainz/
+data/music_warehouse.duckdb
 
 # Spyder project settings
 .spyderproject

@@ -1,44 +1,57 @@
-import duckdb
 import os
+from datetime import datetime, timedelta
+import pandas as pd
+from playwright.sync_api import sync_playwright
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DB_PATH = os.path.join(BASE_DIR, 'data', 'music_warehouse.duckdb')
-JSON_FILE_PATH = os.path.join(BASE_DIR, 'data', 'raw', 'musicbrainz', 'mbdump', 'label')
+URL = "https://kworb.net/spotify/country/global_daily.html"
 
-def load_labels_to_duckdb():
-    print(f"🦆 Connecting to DuckDB at {DB_PATH}...")
-    con = duckdb.connect(DB_PATH)
-    
-    print(f"🔎 Looking for file at: {JSON_FILE_PATH}")
-    
-    if not os.path.exists(JSON_FILE_PATH):
-        raise FileNotFoundError(f"❌ Could not find MusicBrainz dump at {JSON_FILE_PATH}")
+# Absolute path so it hits the mounted volume no matter what
+OUTPUT_DIR = "/opt/airflow/data/raw/kworb"
 
-    print("⏳ Loading Label Data (Memory Safe Mode)...")
+def scrape_kworb():
+    print(f"Starting scrape for {URL}")
+
+    # Ensure the directory exists (it might not if the mount is fresh)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(URL, timeout=60000)
+
+        # Wait for the table to load
+        page.wait_for_selector("table")
+
+        # Extract table data
+        html_content = page.content()
+        browser.close()
+
+    print("Parsing HTML table ")
+    dfs = pd.read_html(html_content)
+
+    if not dfs:
+        raise ValueError("No tables found on the page")
+
+    df = dfs[0]
+    df.columns = [c.lower().replace(" ", "_") for c in df.columns]
+
+    extraction_date = datetime.now().date()
+    # Charts are usually for the previous day
+    chart_date = extraction_date - timedelta(days=1)
+    df["chart_date"] = chart_date
+    df["extracted_at"] = datetime.now()
+
+    filename = f"kworb_spotify_global_daily_{chart_date}.parquet"
+    filepath = os.path.join(OUTPUT_DIR, filename)
+
+    print(f"Saving data to {filepath}")
+    df.to_parquet(filepath, index=False)
     
-    con.execute(f"""
-        CREATE OR REPLACE TABLE raw_musicbrainz_labels AS
-        SELECT 
-            id as mb_id, 
-            name, 
-            "label-code" as label_code,
-            relations
-        FROM read_json('{JSON_FILE_PATH}', 
-            columns={{
-                'id': 'VARCHAR', 
-                'name': 'VARCHAR', 
-                'label-code': 'INTEGER', 
-                'relations': 'JSON',
-                'type': 'VARCHAR'
-            }},
-            maximum_object_size=20000000
-        );
-    """)
-    
-    count = con.execute("SELECT count(*) FROM raw_musicbrainz_labels").fetchone()[0]
-    print(f"✅ Successfully loaded {count:,} labels into 'raw_musicbrainz_labels'.")
-    
-    con.close()
+    # Verification print
+    if os.path.exists(filepath):
+        print(f"✅ Success! File confirmed at: {filepath}")
+    else:
+        raise RuntimeError(f"❌ File write failed at: {filepath}")
 
 if __name__ == "__main__":
-    load_labels_to_duckdb()
+    scrape_kworb()

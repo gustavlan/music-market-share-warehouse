@@ -21,7 +21,8 @@ RUN pip install --no-cache-dir \
     lxml \
     polars \
     networkx \
-    pyarrow
+    pyarrow \
+    spotipy
 
 # NOW switch to root to install SYSTEM dependencies for Playwright
 USER root

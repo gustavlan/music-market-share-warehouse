@@ -53,6 +53,8 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy

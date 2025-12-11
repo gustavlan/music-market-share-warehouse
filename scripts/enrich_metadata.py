@@ -84,3 +84,11 @@ def enrich_artist():
         time.sleep(0.5)  # brief pause to respect rate limits
 
     if results:
+        print(f"Inserting {len(results)} enriched records into dim_track_metadata...")
+        df_results = pd.DataFrame(results)
+        con.sql("INSERT INTO dim_track_metadata SELECT * FROM df_results")
+        print("Success")
+    con.close()
+
+if __name__ == "__main__":
+    enrich_artist()

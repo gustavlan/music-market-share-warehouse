@@ -110,9 +110,7 @@ select market_share_group, count(*) from dim_labels group by 1 order by 2 desc;
 
 Raw chart extracts land under `data/raw/kworb/` as Parquet files named like `kworb_spotify_global_daily_YYYY-MM-DD.parquet`.
 
-## Diagrams
-
-### End-to-end flow
+## End-to-end flow
 
 ```mermaid
 flowchart LR

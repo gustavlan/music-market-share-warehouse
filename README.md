@@ -38,11 +38,7 @@ Mart: `dim_labels` (recursive traversal to map each label to an “ultimate pare
 
 Prerequisites are Docker + Docker Compose.
 
-Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
+Copy the example environment and enter Spotify credentials if you want to do the optional extra enrichment.
 
 Build and start Airflow:
 
@@ -146,8 +142,8 @@ This is an example of the shape of the ownership mapping produced by `dim_labels
 
 ```mermaid
 flowchart LR
-	A[Label / imprint] --> B[Parent label] --> C[Ultimate parent]
-	C --> G[Market group\n(UMG / Sony / Warner / Independent)]
+    A["Label / imprint"] --> B["Parent label"] --> C["Ultimate parent"]
+    C --> G["Market group<br/>(UMG | Sony | Warner | Independent)"]
 ```
 
 ## Future Enhancements

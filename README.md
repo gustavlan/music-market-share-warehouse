@@ -1,6 +1,12 @@
 # music-market-share-warehouse
 
-This repository is a small, reproducible data warehouse project that focuses on building and orchestrating an end-to-end pipeline around music industry “ownership” metadata. The goal is to make it possible to attribute streaming activity to ultimate parent labels that are investable securities (e.g., UMG/Sony/Warner vs. independent) using public, alternative datasets.
+This repository is a small, reproducible data warehouse project that focuses on building and orchestrating an end-to-end pipeline around music industry “ownership” metadata. The goal is to make it possible to attribute streaming activity to ultimate parent labels that are investable securities (e.g., UMG/Sony/Warner vs. independent) using public, alternative datasets. Illustrative path produced by `dim_labels.ownership_path`:
+
+```mermaid
+flowchart LR
+    A["Label / imprint"] --> B["Parent label"] --> C["Ultimate parent"]
+    C --> G["Market group<br/>(UMG | Sony | Warner | Independent)"]
+```
 
 The project is intentionally local first: it runs in Docker, orchestrates jobs with Airflow, stores data in DuckDB, and models transformations with dbt. The emphasis is on the workflow and data modeling mechanics (ingestion, idempotency, transforms, and lineage).
 
@@ -132,16 +138,6 @@ flowchart LR
 	KW --> AF --> RAW
 	MB --> AF --> DB
 	DB --> DBT --> DIM
-```
-
-### Ownership path (illustrative)
-
-This is an example of the shape of the ownership mapping produced by `dim_labels.ownership_path`.
-
-```mermaid
-flowchart LR
-    A["Label / imprint"] --> B["Parent label"] --> C["Ultimate parent"]
-    C --> G["Market group<br/>(UMG | Sony | Warner | Independent)"]
 ```
 
 ## Future Enhancements

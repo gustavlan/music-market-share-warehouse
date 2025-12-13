@@ -22,6 +22,19 @@ The Airflow DAGs live in [dags](dags).
 
 `setup_musicbrainz_data` is intended to be triggered manually. It loads the MusicBrainz label dump into DuckDB as `main.raw_musicbrainz_labels`, then runs dbt to build the transformed label models.
 
+```mermaid
+flowchart LR
+	subgraph setup_musicbrainz_data
+		LBL[load_labels_to_duckdb\npython scripts/load_musicbrainz.py]
+		RUN[run_dbt_models\ndbt run --select stg_musicbrainz_labels int_label_relationships dim_labels]
+		LBL --> RUN
+	end
+
+	subgraph music_market_share_ingest
+		SCR[scrape_kworb_data\npython scripts/scrape_kworb.py]
+	end
+```
+
 ## Warehouse and dbt models
 
 The DuckDB database file is `data/music_warehouse.duckdb` (mounted into the Airflow containers as `/opt/airflow/data/music_warehouse.duckdb`). The dbt project is in [dbt_project](dbt_project) and targets DuckDB via [dbt_project/profiles.yml](dbt_project/profiles.yml).
@@ -33,6 +46,18 @@ Staging: `stg_musicbrainz_labels` (light renames and passthrough)
 Intermediate: `int_label_relationships` (unnests `relations` from the raw JSON into one row per relationship)
 
 Mart: `dim_labels` (recursive traversal to map each label to an “ultimate parent” and assign it to a coarse market group)
+
+#### dbt lineage (label ownership models)
+
+```mermaid
+flowchart LR
+	RAW[source: main.raw_musicbrainz_labels]
+	STG[stg_musicbrainz_labels]
+	INT[int_label_relationships]
+	DIM[dim_labels]
+
+	RAW --> STG --> INT --> DIM
+```
 
 ## Quickstart (local)
 
@@ -107,33 +132,6 @@ flowchart LR
 	KW --> AF --> RAW
 	MB --> AF --> DB
 	DB --> DBT --> DIM
-```
-
-### Airflow DAGs (as implemented)
-
-```mermaid
-flowchart LR
-	subgraph setup_musicbrainz_data
-		LBL[load_labels_to_duckdb\npython scripts/load_musicbrainz.py]
-		RUN[run_dbt_models\ndbt run --select stg_musicbrainz_labels int_label_relationships dim_labels]
-		LBL --> RUN
-	end
-
-	subgraph music_market_share_ingest
-		SCR[scrape_kworb_data\npython scripts/scrape_kworb.py]
-	end
-```
-
-### dbt lineage (label ownership models)
-
-```mermaid
-flowchart LR
-	RAW[source: main.raw_musicbrainz_labels]
-	STG[stg_musicbrainz_labels]
-	INT[int_label_relationships]
-	DIM[dim_labels]
-
-	RAW --> STG --> INT --> DIM
 ```
 
 ### Ownership path (illustrative)

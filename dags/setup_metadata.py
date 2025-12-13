@@ -16,3 +16,15 @@ with DAG(
         task_id='load_labels_to_duckdb',
         bash_command='python /opt/airflow/scripts/load_musicbrainz.py'
     )
+
+    run_dbt = BashOperator(
+        task_id='run_dbt_models',
+        bash_command=(
+            'dbt run '
+            '--project-dir /opt/airflow/dbt_project '
+            '--profiles-dir /opt/airflow/dbt_project '
+            '--select stg_musicbrainz_labels int_label_relationships dim_labels'
+        ),
+    )
+
+    load_labels >> run_dbt

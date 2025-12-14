@@ -7,8 +7,9 @@ sources:
       - name: raw_musicbrainz_labels
         description: "Raw JSON ingest of MusicBrainz labels"
 
-  - name: spotify
+  - name: spotify_enrichment
     schema: main
+    description: "Tables populated by Python enrichment scripts (outside dbt)"
     tables:
-      - name: daily_charts
-        description: "Daily top 200 streams from Kworb"
+      - name: dim_track_metadata
+        description: "Track/artist label info enriched from Spotify API"

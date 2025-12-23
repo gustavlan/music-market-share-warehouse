@@ -1,143 +1,133 @@
-# music-market-share-warehouse
+# Music Market Share Warehouse
 
-This repository is a small, reproducible data warehouse project that focuses on building and orchestrating an end-to-end pipeline around music industry “ownership” metadata. The goal is to make it possible to attribute streaming activity to ultimate parent labels that are investable securities (e.g., UMG/Sony/Warner vs. independent) using public, alternative datasets. Illustrative path produced by `dim_labels.ownership_path`:
+End-to-end data pipeline attributing Spotify streaming volume to ultimate parent labels (UMG, Sony, Warner vs. Independent). Built with Airflow, DuckDB, and dbt.
 
 ```mermaid
 flowchart LR
-    A["Label / imprint"] --> B["Parent label"] --> C["Ultimate parent"]
-    C --> G["Market group<br/>(UMG | Sony | Warner | Independent)"]
+    A["Spotify Charts"] --> B["Label Enrichment"] --> C["Ownership Hierarchy"] --> D["Market Share"]
 ```
 
-The project is intentionally local first: it runs in Docker, orchestrates jobs with Airflow, stores data in DuckDB, and models transformations with dbt. The emphasis is on the workflow and data modeling mechanics (ingestion, idempotency, transforms, and lineage).
+## Results
+
+Market share by parent group (Dec 2024 daily charts, 26.9B streams):
+
+| Parent Group | Streams | Share |
+|-------------|--------:|------:|
+| Universal Music Group | 11.3B | 41.9% |
+| Sony Music Entertainment | 6.3B | 23.3% |
+| Warner Music Group | 5.4B | 20.2% |
+| Independent / Other | 2.9B | 10.8% |
+| Unmapped | 1.0B | 3.8% |
+| **Big 3 Total** | **23.0B** | **85.4%** |
+
+The 85% reported here is higher than the commonly cited 65-70% for the big 3 because this project measures chart-topping tracks only, hits skew heavily toward majors who dominate playlist placement and marketing. The 65-70% figure covers all streaming including long-tail catalog.
 
 ## Architecture
 
-Airflow runs two pipelines: a daily chart ingestion that lands raw data to a local “data lake” directory, and a metadata setup pipeline that loads MusicBrainz label data into DuckDB and runs dbt models to build a label ownership dimension. DuckDB is used as the warehouse and dbt is used to define the transformation layers (staging → intermediate → mart).
+```mermaid
+flowchart TB
+    subgraph Sources
+        KW[Kworb Charts]
+        SP[Spotify API]
+        MB[MusicBrainz Dumps]
+    end
+    
+    subgraph Airflow
+        ING[Daily Ingestion]
+        ENR[Metadata Enrichment]
+        SET[Setup Pipeline]
+    end
+    
+    subgraph DuckDB
+        RAW[(Raw Tables)]
+        STG[(Staging)]
+        MART[(Marts)]
+    end
+    
+    KW --> ING --> RAW
+    SP --> ENR --> RAW
+    MB --> SET --> RAW
+    RAW --> STG --> MART
+```
 
-## Data sources
+**Stack:** Docker Compose / Airflow 2.10 / DuckDB / dbt-core
 
-Chart data is scraped from Kworb’s Spotify chart pages. Label reference data comes from the MusicBrainz JSON dumps, which include label-to-label relationships needed to build an ownership hierarchy.
+## Pipeline
 
-Spotify credentials are only needed for optional enrichment scripts, the core ingestion + dbt label models do not require them.
+1. **Ingest** — Scrape daily Spotify charts from Kworb → Parquet
+2. **Enrich** — Query Spotify API for track→label metadata
+3. **Load** — MusicBrainz label dumps → DuckDB (321K labels, 64K relationships)
+4. **Transform** — dbt builds ownership hierarchy via recursive traversal
+5. **Aggregate** — Incremental fact table joins charts to parent groups
 
-## What runs in Airflow
-
-The Airflow DAGs live in [dags](dags).
-
-`music_market_share_ingest` runs daily and executes a Python scraper that writes Parquet files under `data/raw/kworb/`.
-
-`setup_musicbrainz_data` is intended to be triggered manually. It loads the MusicBrainz label dump into DuckDB as `main.raw_musicbrainz_labels`, then runs dbt to build the transformed label models.
+## dbt Lineage
 
 ```mermaid
 flowchart LR
-	subgraph setup_musicbrainz_data
-		LBL[load_labels_to_duckdb\npython scripts/load_musicbrainz.py]
-		RUN[run_dbt_models\ndbt run --select stg_musicbrainz_labels int_label_relationships dim_labels]
-		LBL --> RUN
-	end
-
-	subgraph music_market_share_ingest
-		SCR[scrape_kworb_data\npython scripts/scrape_kworb.py]
-	end
+    subgraph sources
+        S1[raw_musicbrainz_labels]
+        S2[raw_kworb_charts]
+        S3[dim_track_metadata]
+    end
+    
+    subgraph staging
+        STG1[stg_musicbrainz_labels]
+        STG2[stg_combined_charts]
+        STG3[stg_track_metadata_normalized]
+        STG4[stg_dim_labels_normalized]
+    end
+    
+    subgraph intermediate
+        INT1[int_label_relationships]
+        INT2[int_charts_with_track_id]
+    end
+    
+    subgraph marts
+        DIM[dim_labels]
+        FACT[fact_market_share]
+    end
+    
+    S1 --> STG1 --> INT1 --> DIM --> STG4
+    S2 --> STG2 --> INT2
+    S3 --> STG3 --> INT2
+    STG3 --> FACT
+    STG4 --> FACT
+    INT2 --> FACT
 ```
 
-## Warehouse and dbt models
-
-The DuckDB database file is `data/music_warehouse.duckdb` (mounted into the Airflow containers as `/opt/airflow/data/music_warehouse.duckdb`). The dbt project is in [dbt_project](dbt_project) and targets DuckDB via [dbt_project/profiles.yml](dbt_project/profiles.yml).
-
-The label modeling layer is split into:
-
-Staging: `stg_musicbrainz_labels` (light renames and passthrough)
-
-Intermediate: `int_label_relationships` (unnests `relations` from the raw JSON into one row per relationship)
-
-Mart: `dim_labels` (recursive traversal to map each label to an “ultimate parent” and assign it to a coarse market group)
-
-#### dbt lineage (label ownership models)
-
-```mermaid
-flowchart LR
-	RAW[source: main.raw_musicbrainz_labels]
-	STG[stg_musicbrainz_labels]
-	INT[int_label_relationships]
-	DIM[dim_labels]
-
-	RAW --> STG --> INT --> DIM
-```
-
-## Quickstart (local)
-
-Prerequisites are Docker + Docker Compose.
-
-Copy the example environment and enter Spotify credentials if you want to do the optional extra enrichment.
-
-Build and start Airflow:
+## Quickstart
 
 ```bash
+cp .env.example .env  # Add Spotify credentials for enrichment
 docker compose up --build
 ```
 
-Open the Airflow UI at `http://localhost:8080` (default credentials are `admin` / `admin` as configured in docker-compose).
+Open Airflow at `localhost:8080` (admin/admin). Trigger `setup_musicbrainz_data`, then unpause `music_market_share_ingest`.
 
-Trigger the setup pipeline once:
-
-1) In the UI, unpause `setup_musicbrainz_data`.
-
-2) Trigger it manually.
-
-This loads `raw_musicbrainz_labels` and then runs dbt (`stg_musicbrainz_labels`, `int_label_relationships`, `dim_labels`).
-
-The daily ingestion pipeline can be unpaused afterwards:
-
-1) Unpause `music_market_share_ingest`.
-
-2) Let it run on schedule (or trigger manually).
-
-## Inspecting outputs
-
-You can query the DuckDB warehouse directly. For example (from your host machine):
-
+Query results:
 ```bash
-duckdb data/music_warehouse.duckdb
+duckdb data/music_warehouse.duckdb "
+  SELECT parent_group, SUM(total_streams) as streams
+  FROM fact_market_share GROUP BY 1 ORDER BY 2 DESC
+"
 ```
 
-Then:
+## Data Sources
 
-```sql
-select count(*) from dim_labels;
-select market_share_group, count(*) from dim_labels group by 1 order by 2 desc;
-```
+| Source | Description | Update |
+|--------|-------------|--------|
+| [Kworb](https://kworb.net) | Daily Spotify global charts | Daily scrape |
+| [MusicBrainz](https://musicbrainz.org) | Label ownership relationships | Manual dump load |
+| Spotify API | Track → album → label metadata | On-demand enrichment |
 
-Raw chart extracts land under `data/raw/kworb/` as Parquet files named like `kworb_spotify_global_daily_YYYY-MM-DD.parquet`.
+## Future Work
 
-## End-to-end flow
+- **Merlin integration** — Cross-reference indie labels against Merlin member list to distinguish independent from indie distributed by major.
+- **Time-series analysis** — Market share trends, seasonality detection, regime change identification
+- **Causal inference** — Impact of playlist placement, release timing, and marketing spend on market share shifts
+- **Predictive modeling** — Forecast label market share using leading indicators (social buzz, playlist adds, release schedule)
+- **Trading signals** — Backtest strategies correlating streaming momentum with UMG/Sony/Warner equity returns
 
-```mermaid
-flowchart LR
-	subgraph Sources
-		KW[Kworb Spotify charts]
-		MB[MusicBrainz JSON dumps]
-	end
+## License
 
-	subgraph Orchestration
-		AF[Airflow]
-	end
-
-	subgraph Storage
-		RAW[(data/raw/...\nParquet + dumps)]
-		DB[(DuckDB\ndata/music_warehouse.duckdb)]
-	end
-
-	subgraph Transforms
-		DBT[dbt]
-		DIM[dim_labels\nultimate parent + market group]
-	end
-
-	KW --> AF --> RAW
-	MB --> AF --> DB
-	DB --> DBT --> DIM
-```
-
-## Future Enhancements
-
-This repo currently focuses on orchestrating ingestion and building the label ownership dimension. The chart ingestion writes Parquet to the local data directory; loading chart rows into DuckDB and joining chart stream volumes to `dim_labels` is the natural next step if you want a fully automated “market share over time” mart.
+MIT

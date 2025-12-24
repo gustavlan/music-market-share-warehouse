@@ -22,7 +22,9 @@ RUN pip install --no-cache-dir \
     polars \
     networkx \
     pyarrow \
-    spotipy
+    spotipy \
+    tenacity \
+    yfinance
 
 # Switch to root to install SYSTEM dependencies for playwright
 USER root

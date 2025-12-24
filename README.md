@@ -1,11 +1,21 @@
-# Music Market Share Warehouse
+# Music Industry Alternative Data & Price Signals
 
-End-to-end data pipeline attributing Spotify streaming volume to ultimate parent labels (UMG, Sony, Warner vs. Independent). Built with Airflow, DuckDB, and dbt.
+End-to-end alternative data pipeline that constructs a proprietary dataset tracking the daily streaming market share of major music labels (Universal, Sony, Warner) and correlates this with their stock prices for quantitative research.
 
 ```mermaid
 flowchart LR
-    A["Spotify Charts"] --> B["Label Enrichment"] --> C["Ownership Hierarchy"] --> D["Market Share"]
+    A["Spotify Charts\n(Alt Data)"] --> B["Label Enrichment"] --> C["Entity Resolution\n(Graph Theory)"] --> D["Market Share\nTime Series"] --> E["Stock Correlation\n& Alpha Signals"]
 ```
+
+## Project Highlights
+
+| Capability | Implementation |
+|------------|----------------|
+| **Alternative Data Collection** | Web scraping (Playwright) + API enrichment (Spotify) |
+| **Entity Resolution** | Graph traversal (NetworkX) to resolve nested corporate ownership |
+| **Data Warehouse** | Incremental dbt models on DuckDB with data quality tests |
+| **Financial Integration** | Stock price fetching (yfinance) for UMG.AS, WMG, SONY |
+| **Quantitative Analysis** | Momentum signals, correlation analysis, lead/lag studies |
 
 ## Results
 
@@ -98,6 +108,31 @@ flowchart LR
 
 *Note: `dim_labels` is created by Python/NetworkX (not dbt) via graph traversal of MusicBrainz ownership relationships.*
 
+## Entity Resolution via Graph Theory
+
+A key technical challenge is resolving the ultimate parent company to a tradable entity for thousands of sub-labels. For example:
+- "pgLang, under exclusive license to Interscope Records" → Interscope → Universal Music Group
+
+The [`scripts/build_hierarchy.py`](scripts/build_hierarchy.py) script uses NetworkX to:
+1. Build a directed graph of 64K+ label-to-label ownership relationships from MusicBrainz
+2. Traverse the graph recursively to find the root parent node for each label
+3. Classify labels into market share groups (UMG, Sony, Warner, Independent)
+
+This approach handles complex nested ownership that would be impossible to resolve with simple pattern matching.
+
+## Quantitative Analysis
+
+The [`notebooks/market_share_alpha.ipynb`](notebooks/market_share_alpha.ipynb) notebook explores: Market share trends of the big 3 with moving averages. Momentum signals, Z-score deviations, rate-of-change indicators. Stock Correlation,Market share vs UMG.AS, WMG, SONY stock prices.Lead/Lag Analysis, does streaming momentum predict stock returns?
+
+To run the analysis:
+```bash
+# Fetch stock prices
+python scripts/fetch_financials.py
+
+# Open the notebook
+jupyter notebook notebooks/market_share_alpha.ipynb
+```
+
 ## Quickstart
 
 ```bash
@@ -122,14 +157,15 @@ duckdb data/music_warehouse.duckdb "
 | [Kworb](https://kworb.net) | Daily Spotify global charts | Daily scrape |
 | [MusicBrainz](https://musicbrainz.org) | Label ownership relationships | Manual dump load |
 | Spotify API | Track → album → label metadata | On-demand enrichment |
+| Yahoo Finance | UMG.AS, WMG, SONY stock prices | On-demand fetch |
 
 ## Future Work
 
 - **Merlin integration** — Cross-reference indie labels against Merlin member list to distinguish independent from indie distributed by major.
-- **Time-series analysis** — Market share trends, seasonality detection, regime change identification
-- **Causal inference** — Impact of playlist placement, release timing, and marketing spend on market share shifts
-- **Predictive modeling** — Forecast label market share using leading indicators (social buzz, playlist adds, release schedule)
-- **Trading signals** — Backtest strategies correlating streaming momentum with UMG/Sony/Warner equity returns
+- **Backtesting framework** — Build simple trading strategies based on market share momentum signals
+- **Granger causality** — Statistical tests to validate predictive relationships
+- **Earnings correlation** — Map quarterly market share trends to earnings surprises
+- **Multi-platform expansion** — Add Apple Music, Amazon Music for broader coverage
 
 ## License
 

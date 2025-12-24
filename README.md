@@ -7,8 +7,6 @@ flowchart LR
     A["Spotify Charts\n(Alt Data)"] --> B["Label Enrichment"] --> C["Entity Resolution\n(Graph Theory)"] --> D["Market Share\nTime Series"] --> E["Stock Correlation\n& Alpha Signals"]
 ```
 
-Alternative Data Collection with web scraping (Playwright) + API enrichment (Spotify). Entity Resolution using graph traversal (NetworkX) to resolve nested corporate ownership. Data Warehouse implemented with incremental dbt models on DuckDB with data quality tests. Stock price fetching (yfinance) for UMG.AS, WMG, SONY and quantative analysis with momentum signals, correlation analysis, lead/lag studies.
-
 ## Results
 
 Market share by parent group (Dec 2024 daily charts, 26.9B streams):
@@ -52,15 +50,9 @@ flowchart TB
     RAW --> STG --> MART
 ```
 
-**Stack:** Docker Compose / Airflow 2.10 / DuckDB / dbt-core
+Daily charts are scraped from Kworb via Playwright, enriched with label metadata from Spotify's API, then joined against MusicBrainz's 321K label taxonomy. dbt transforms resolve ownership hierarchies and aggregate streams into an incremental fact table by parent group.
 
-## Pipeline
-
-1. **Ingest** — Scrape daily Spotify charts from Kworb → Parquet
-2. **Enrich** — Query Spotify API for track→label metadata
-3. **Load** — MusicBrainz label dumps → DuckDB (321K labels, 64K relationships)
-4. **Transform** — dbt builds ownership hierarchy via recursive traversal
-5. **Aggregate** — Incremental fact table joins charts to parent groups
+**Stack:** Docker Compose · Airflow 2.10 · DuckDB · dbt-core · NetworkX
 
 ## dbt Lineage
 

@@ -7,15 +7,7 @@ flowchart LR
     A["Spotify Charts\n(Alt Data)"] --> B["Label Enrichment"] --> C["Entity Resolution\n(Graph Theory)"] --> D["Market Share\nTime Series"] --> E["Stock Correlation\n& Alpha Signals"]
 ```
 
-## Project Highlights
-
-| Capability | Implementation |
-|------------|----------------|
-| **Alternative Data Collection** | Web scraping (Playwright) + API enrichment (Spotify) |
-| **Entity Resolution** | Graph traversal (NetworkX) to resolve nested corporate ownership |
-| **Data Warehouse** | Incremental dbt models on DuckDB with data quality tests |
-| **Financial Integration** | Stock price fetching (yfinance) for UMG.AS, WMG, SONY |
-| **Quantitative Analysis** | Momentum signals, correlation analysis, lead/lag studies |
+Alternative Data Collection with web scraping (Playwright) + API enrichment (Spotify). Entity Resolution using graph traversal (NetworkX) to resolve nested corporate ownership. Data Warehouse implemented with incremental dbt models on DuckDB with data quality tests. Stock price fetching (yfinance) for UMG.AS, WMG, SONY and quantative analysis with momentum signals, correlation analysis, lead/lag studies.
 
 ## Results
 

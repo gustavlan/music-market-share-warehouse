@@ -11,7 +11,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 URL = "https://kworb.net/spotify/country/global_daily.html"
-OUTPUT_DIR = "/opt/airflow/data/raw/kworb"
+# Use DATA_DIR env var (Docker) or default to local ./data path
+BASE_DIR = os.getenv("DATA_DIR", os.path.join(os.path.dirname(__file__), "..", "data"))
+OUTPUT_DIR = os.path.join(BASE_DIR, "raw", "kworb")
 
 
 @retry(

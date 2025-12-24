@@ -28,7 +28,8 @@ TICKERS = {
     "SONY": "Sony Group Corporation"
 }
 
-BASE_DIR = os.getenv("DATA_DIR", "/opt/airflow/data")
+# Use DATA_DIR env var (Docker) or default to local ./data path
+BASE_DIR = os.getenv("DATA_DIR", os.path.join(os.path.dirname(__file__), "..", "data"))
 DB_PATH = os.path.join(BASE_DIR, "music_warehouse.duckdb")
 
 

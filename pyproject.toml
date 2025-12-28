@@ -1,0 +1,43 @@
+[project]
+name = "music-market-share-warehouse"
+version = "0.1.0"
+description = "End-to-end alternative data pipeline for music market share analysis"
+requires-python = ">=3.10"
+dependencies = [
+    "apache-airflow>=2.10.0",
+    "duckdb>=0.10.0",
+    "dbt-core>=1.8.0",
+    "dbt-duckdb>=1.8.0",
+    "pandas>=2.0.0",
+    "spotipy>=2.23.0",
+    "yfinance>=0.2.0",
+    "networkx>=3.0",
+    "playwright>=1.40.0",
+    "beautifulsoup4>=4.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.3.0",
+    "jupyter>=1.0.0",
+    "matplotlib>=3.8.0",
+    "seaborn>=0.13.0",
+]
+
+[tool.ruff]
+# Same as Black.
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+select = ["E4", "E7", "E9", "F"]
+ignore = []
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]

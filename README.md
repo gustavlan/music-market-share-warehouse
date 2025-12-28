@@ -26,33 +26,24 @@ The 85% reported here is higher than the commonly cited 65-70% for the big 3 bec
 
 ```mermaid
 flowchart TB
-    subgraph Sources
-        KW[Kworb Charts]
-        SP[Spotify API]
-        MB[MusicBrainz Dumps]
+    subgraph Airflow["Airflow Orchestration"]
+        direction TB
+        Daily_Trigger((Daily)) --> Scrape[Scrape Kworb]
+        Daily_Trigger --> Stocks[Fetch Yahoo Finance]
+        Scrape --> Load[Load to DuckDB]
+        Load --> Check{New Tracks?}
+        Check -- Yes --> Enrich[Spotify API Enrichment]
+        Check -- No --> Skip[Skip API Calls]
     end
-    
-    subgraph Airflow
-        ING[Daily Ingestion]
-        ENR[Metadata Enrichment]
-        FIN[Financials]
-        SET[Setup Pipeline]
+
+    subgraph Data["Data Warehouse"]
+        Enrich --> RAW
+        Stocks --> RAW
+        RAW --> STG --> MART
     end
-    
-    subgraph DuckDB
-        RAW[(Raw Tables)]
-        STG[(Staging)]
-        MART[(Marts)]
-    end
-    
-    KW --> ING --> RAW
-    SP --> ENR --> RAW
-    MB --> SET --> RAW
-    FIN --> RAW
-    RAW --> STG --> MART
 ```
 
-Daily charts are scraped from Kworb via Playwright, enriched with label metadata from Spotify's API, then joined against MusicBrainz's 321K label taxonomy. Financial data is fetched daily from Yahoo Finance. dbt transforms resolve ownership hierarchies and aggregate streams into an incremental fact table by parent group.
+Daily charts are scraped from Kworb via Playwright. A trigger in Airflow checks the staging area for new tracks and only calls the Spotify API if metadata is missing, saving API quota and execution time. Financial data is fetched independently. dbt transforms resolve ownership hierarchies and aggregate streams.
 
 **Stack:** Docker Compose · Airflow 2.10 · DuckDB · dbt-core · NetworkX
 
@@ -108,14 +99,11 @@ This approach handles complex nested ownership that would be impossible to resol
 
 ## Quantitative Analysis
 
-The [`notebooks/market_share_alpha.ipynb`](notebooks/market_share_alpha.ipynb) notebook explores: Market share trends of the big 3 with moving averages. Momentum signals, Z-score deviations, rate-of-change indicators. Stock Correlation,Market share vs UMG.AS, WMG, SONY stock prices.Lead/Lag Analysis, does streaming momentum predict stock returns?
+The [`notebooks/market_share_alpha.ipynb`](notebooks/market_share_alpha.ipynb) notebook explores market share trends of the big 3 with moving averages, momentum signals, Z-score deviations, rate-of-change indicators, correlations of market share vs UMG.AS, WMG, SONY stock prices, and lead/lag analysis.
 
 To run the analysis:
 ```bash
-# Fetch stock prices
-python scripts/fetch_financials.py
-
-# Open the notebook
+# Open the notebook (Data is already fetched by Airflow)
 jupyter notebook notebooks/market_share_alpha.ipynb
 ```
 
@@ -140,10 +128,10 @@ duckdb data/music_warehouse.duckdb "
 
 | Source | Description | Update |
 |--------|-------------|--------|
-| [Kworb](https://kworb.net) | Daily Spotify global charts | Daily scrape |
-| [MusicBrainz](https://musicbrainz.org) | Label ownership relationships | Manual dump load |
-| Spotify API | Track → album → label metadata | On-demand enrichment |
-| Yahoo Finance | UMG.AS, WMG, SONY stock prices | On-demand fetch |
+| [Kworb](https://kworb.net) | Daily Spotify global charts | Daily (Airflow) |
+| [MusicBrainz](https://musicbrainz.org) | Label ownership relationships | One-off / Manual |
+| Spotify API | Track → album → label metadata | Daily (Airflow) |
+| Yahoo Finance | UMG.AS, WMG, SONY stock prices | Daily (Airflow) |
 
 ## Future Work
 

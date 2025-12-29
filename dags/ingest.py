@@ -55,15 +55,14 @@ with DAG(
     build_dbt_models_task = BashOperator(
         task_id='build_dbt_models',
         bash_command=(
+            'dbt deps '
+            '--project-dir /opt/airflow/dbt_project '
+            '--profiles-dir /opt/airflow/dbt_project '
+            '&& '
             'dbt run '
             '--project-dir /opt/airflow/dbt_project '
             '--profiles-dir /opt/airflow/dbt_project '
-            '--select '
-            'stg_combined_charts '
-            'stg_track_metadata_normalized '
-            'stg_dim_labels_normalized '
-            'int_charts_with_track_id '
-            'fact_market_share'
+            '--select +fact_market_share'
         ),
     )
 

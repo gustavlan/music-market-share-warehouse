@@ -1,6 +1,6 @@
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator, ShortCircuitOperator
+from airflow.operators.python import PythonOperator, BranchPythonOperator
 from airflow.operators.empty import EmptyOperator
 from datetime import datetime, timedelta
 import duckdb
@@ -13,13 +13,26 @@ SCRIPTS_DIR = '/opt/airflow/scripts'
 
 def load_kworb_to_duckdb():
     """
-    Loads the latest Kworb parquet files into the staging table 
+    Loads the latest Kworb parquet files into a staging object
     so the enrichment script can query them.
     """
     con = duckdb.connect(DB_PATH)
-    # Create the view or table expected by enrich_metadata.py
+    # Ensure a consistent object type for downstream steps.
+    # dbt or previous runs may have created stg_combined_charts as a VIEW.
+    existing_type = con.execute(
+        """
+        SELECT table_type
+        FROM information_schema.tables
+        WHERE table_schema = 'main'
+          AND table_name = 'stg_combined_charts'
+        """
+    ).fetchone()
+
+    if existing_type is not None and existing_type[0] != 'VIEW':
+        con.execute("DROP TABLE stg_combined_charts")
+    # Create the view expected by enrich_metadata.py (and compatible with dbt defaults)
     con.execute("""
-        CREATE OR REPLACE TABLE stg_combined_charts AS 
+        CREATE OR REPLACE VIEW stg_combined_charts AS 
         SELECT * FROM read_parquet('/opt/airflow/data/raw/kworb/*.parquet')
     """)
     con.close()
@@ -63,6 +76,10 @@ def check_if_enrichment_needed():
     return count > 0
 
 
+def choose_enrichment_path():
+    return 'enrich_metadata' if check_if_enrichment_needed() else 'skip_enrichment'
+
+
 default_args = {
     'owner': 'airflow',
     'retries': 1,
@@ -86,11 +103,15 @@ with DAG(
         python_callable=load_kworb_to_duckdb
     )
 
-    # 2. Smart Trigger to check if need to run the expensive API calls
-    # Also ensures dim_track_metadata table exists for dbt
-    check_enrichment = ShortCircuitOperator(
-        task_id='check_enrichment_needed',
-        python_callable=check_if_enrichment_needed
+    # 2. Decide whether to run expensive API calls.
+    # Also ensures dim_track_metadata table exists for dbt.
+    choose_enrichment = BranchPythonOperator(
+        task_id='choose_enrichment_path',
+        python_callable=choose_enrichment_path
+    )
+
+    skip_enrichment = EmptyOperator(
+        task_id='skip_enrichment'
     )
 
     # 3. Run Spotify Enrichment if check_enrichment returns True
@@ -111,6 +132,7 @@ with DAG(
         trigger_rule='none_failed_min_one_success'
     )
 
-    # Dependencies: load -> check -> enrich -> complete
-    # The trigger_rule on pipeline_complete ensures it runs even if enrichment is skipped
-    load_data >> check_enrichment >> enrich_metadata >> pipeline_complete
+    # Dependencies: load -> choose -> (enrich OR skip) -> complete
+    load_data >> choose_enrichment
+    choose_enrichment >> enrich_metadata >> pipeline_complete
+    choose_enrichment >> skip_enrichment >> pipeline_complete
